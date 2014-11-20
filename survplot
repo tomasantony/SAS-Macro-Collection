@@ -1,0 +1,1079 @@
+/*------------------------------------------------------------------*
+   | MACRO NAME  : survplot
+   | SHORT DESC  : Create high-quality survival plots with flexible
+   |               formatting
+   *------------------------------------------------------------------*
+   | CREATED BY  : Lennon, Ryan                  (08/11/2009  8:33)
+   *------------------------------------------------------------------*
+   | PURPOSE
+   |
+   | This macro makes it easier to customize high-quality survival plots. It
+   | allows for user-defined legends and axes and user-specified line types,
+   | colors and weights. It may also print the log-rank p-value on the plot,
+   | as well as the number at risk, or number of events, or the K-M estimate,
+   | at specified time points underneath the plot. It can also mark the
+   | censor points and may label the lines with group names directly on the
+   | plot. The user may add their own mark-up with an annotate data set or
+   | even specify other options for the PLOT statement.
+   *------------------------------------------------------------------*
+   | OPERATING SYSTEM COMPATIBILITY
+   |
+   | UNIX SAS v8   :
+   | UNIX SAS v9   :   YES
+   | MVS SAS v8    :
+   | MVS SAS v9    :
+   | PC SAS v8     :
+   | PC SAS v9     :
+   *------------------------------------------------------------------*
+   | MACRO CALL
+   |
+   | %survplot(
+   |            DATA= ,
+   |            TIME= ,
+   |            EVENT= ,
+   |            CEN_VL=0,
+   |            CLASS= ,
+   |            TESTOP=0,
+   |            CLASSFT= ,
+   |            CMARKS=0,
+   |            PLOTOP=1,
+   |            PRINTOP=0,
+   |            POINTS= ,
+   |            SCOLOR=black,
+   |            XDIVISOR=365.25,
+   |            LABELS= ,
+   |            LABCOL=black,
+   |            BY= ,
+   |            WHERE= ,
+   |            LEGEND= ,
+   |            YAXIS=98,
+   |            XAXIS=99,
+   |            XMAX= ,
+   |            PVX=38.2,
+   |            PVY=38.2,
+   |            LTY=1 2 15 20 5 41 27 46 33,
+   |            LW=4,
+   |            LCOL=black,
+   |            PERCENT=0,
+   |            FONT=SWISS,
+   |            F1=4.5,
+   |            F2=4.5,
+   |            F3=4.5,
+   |            F4=4.0,
+   |            PLOTNAME= ,
+   |            ANNOTATE= ,
+   |            RTFEXCL=0,
+   |            POPTIONS=
+   |          );
+   *------------------------------------------------------------------*
+   | REQUIRED PARAMETERS
+   |
+   | Name      : DATA
+   | Default   :
+   | Type      : Dataset Name
+   | Purpose   : Input data set
+   |
+   | Name      : TIME
+   | Default   :
+   | Type      : Variable Name (Single)
+   | Purpose   : Name of time-to-event variable
+   |
+   | Name      : EVENT
+   | Default   :
+   | Type      : Variable Name (Single)
+   | Purpose   : Name of event indicator variable
+   |
+   *------------------------------------------------------------------*
+   | OPTIONAL PARAMETERS
+   |
+   | Name      : CEN_VL
+   | Default   : 0
+   | Type      : Number (Range/List)
+   | Purpose   : List of values for EVENT variable which indicate right censoring
+   |
+   | Name      : CLASS
+   | Default   :
+   | Type      : Variable Name (Single)
+   | Purpose   : Classification variable whose values define strata for which separate
+   |             estimates will be computed. Unlike the BY variable(s), these separate
+   |             estimates will be plotted together.
+   |
+   | Name      : TESTOP
+   | Default   : 0
+   | Type      : Number (Single)
+   | Purpose   : 0=No test between CLASS levels (default)
+   |             1=Log-rank test
+   |             2=Wilcoxon test
+   |             3=Likelihood-based test
+   |
+   | Name      : CLASSFT
+   | Default   :
+   | Type      : Text
+   | Purpose   : Format to use for classification variable
+   |
+   | Name      : CMARKS
+   | Default   : 0
+   | Type      : Number (Single)
+   | Purpose   : 0=Do not indicate censoring times (default)
+   |             1=Mark censors on the plot and jitter shared censoring times
+   |             2=Mark censors on the plot and use longer marks depending on the
+   |             number of censored observations at each time point
+   |
+   | Name      : PLOTOP
+   | Default   : 1
+   | Type      : Number (Single)
+   | Purpose   : 1=Plot the K-M estimate (P[survival])
+   |             2=Plot 1-KM (P[event])
+   |
+   | Name      : PRINTOP
+   | Default   : 0
+   | Type      : Number (Single)
+   | Purpose   : 0=Print nothing below the plot (default)
+   |             1=Print the number at risk
+   |             2=Print the number of events
+   |             3=Print the K-M estimate (i.e. y-coordinate)
+   |             4=Print K-M estimate (N at risk)
+   |             5=Print K-M estimate (N events)
+   |
+   | Name      : POINTS
+   | Default   :
+   | Type      : Text
+   | Purpose   : If PRINTOP>0, gives the time points at which to report estimates
+   |             below the plot (in TIME units). Ignored if PRINTOP=0. Should be
+   |             enclosed in single quotes.
+   |
+   | Name      : SCOLOR
+   | Default   : black
+   | Type      : Text
+   | Purpose   : Color of text for statistics printed below the plot. The last color
+   |             will be repeated as needed. (default=black)
+   |
+   | Name      : XDIVISOR
+   | Default   : 365.25
+   | Type      : Number (Single)
+   | Purpose   : Plot the x-axis in units of (TIME units)/XDIVISOR. (default=365.25)
+   |
+   | Name      : LABELS
+   | Default   :
+   | Type      : Number (Range/List)
+   | Purpose   : (blank) = No labels placed on plot (default)
+   |             1 = Label class level above the line
+   |             2 = Label class level to the right
+   |             3 = Label class level below the line
+   |             You may specify different values for each class level, e.g.
+   |             "LABELS=1 3," would place the first class value above the line,
+   |             and all others below.
+   |
+   | Name      : LABCOL
+   | Default   : black
+   | Type      : Text
+   | Purpose   : Colors for group labels on the plot. The last value will be repeated
+   |             as necessary. (default=black)
+   |
+   | Name      : BY
+   | Default   :
+   | Type      : Variable Name (List)
+   | Purpose   : Variables for BY processing
+   |
+   | Name      : WHERE
+   | Default   :
+   | Type      : Text
+   | Purpose   : Include a WHERE clause for subsetting, such as
+   |             WHERE = %str(sex='M'),
+   |             WHERE = age<60,
+   |             Use the %str function if the condition contains special characters
+   |             such as =,;().
+   |
+   | Name      : LEGEND
+   | Default   :
+   | Type      : Number (Single)
+   | Purpose   : Number of user specified legend to use. For example "LEGEND=1," means
+   |             to use LEGEND1. Enter LEGEND=0 to omit a legend. Leaving the parameter
+   |             blank (default) indicates to use the SAS default legend.
+   |
+   | Name      : YAXIS
+   | Default   : 98
+   | Type      : Number (Single)
+   | Purpose   : User specified Y-axis. (e.g. "YAXIS=1" means to use AXIS1)
+   |             The default axis (AXIS98) is defined within the macro.
+   |
+   | Name      : XAXIS
+   | Default   : 99
+   | Type      : Number (Single)
+   | Purpose   : User specified X-axis. (e.g. "XAXIS=2" means to use AXIS2)
+   |             The default axis (AXIS99) is defined within the macro.
+   |
+   | Name      : XMAX
+   | Default   :
+   | Type      : Number (Single)
+   | Purpose   : Maximum length of time to plot survival, in units of TIME/XDIVISOR.
+   |             This only cuts off the plot - the hypothesis test (if specified) will
+   |             still be conducted on the full data.
+   |
+   | Name      : PVX
+   | Default   : 38.2
+   | Type      : Number (Single)
+   | Purpose   : X-coordinate at which to print the test p-value (in percentage of
+   |             data area values)
+   |
+   | Name      : PVY
+   | Default   : 38.2
+   | Type      : Number (Single)
+   | Purpose   : Y-coordinate at which to print the test p-value (in percentage of
+   |             data area values)
+   |
+   | Name      : LTY
+   | Default   : 1 2 15 20 5 41 27 46 33
+   | Type      : Number (Range/List)
+   | Purpose   : Line types lines for each class level. The last value will be repeated
+   |             as necessary.
+   |
+   | Name      : LW
+   | Default   : 4
+   | Type      : Number (Range/List)
+   | Purpose   : Line weights for each class level. The last value will be repeated as
+   |             necessary.
+   |
+   | Name      : LCOL
+   | Default   : black
+   | Type      : Text
+   | Purpose   : Line colors for each class level. The last value will be repeated as
+   |             necessary.
+   |
+   | Name      : PERCENT
+   | Default   : 0
+   | Type      : Number (Single)
+   | Purpose   : 0 = Plot K-M estimates as proportions (default)
+   |             1 = Plot K-M estimates as percentages
+   |
+   | Name      : FONT
+   | Default   : SWISS
+   | Type      : Text
+   | Purpose   : Common font for plot.
+   |
+   | Name      : F1
+   | Default   : 4.5
+   | Type      : Number (Single)
+   | Purpose   : Font size for N at risk below plot (by percentage of graphics area).
+   |
+   | Name      : F2
+   | Default   : 4.5
+   | Type      : Number (Single)
+   | Purpose   : Font size for AXIS labels on plot (by percentage of graphics area).
+   |
+   | Name      : F3
+   | Default   : 4.5
+   | Type      : Number (Single)
+   | Purpose   : Font size for p-value on plot (by percentage of graphics area).
+   |
+   | Name      : F4
+   | Default   : 4.0
+   | Type      : Number (Single)
+   | Purpose   : Font size for labels on plot (by percentage of graphics area). See
+   |             LABELS parameter.
+   |
+   | Name      : PLOTNAME
+   | Default   :
+   | Type      : Text
+   | Purpose   : Name the plot in the graphics catalog.
+   |
+   | Name      : ANNOTATE
+   | Default   :
+   | Type      : Dataset Name
+   | Purpose   : Name of annotate data set to add to plot.
+   |
+   | Name      : RTFEXCL
+   | Default   : 0
+   | Type      : Number (Single)
+   | Purpose   : 0 = Do no exclude anything from RTF destination (default)
+   |             1 = Exclude procedure output from RTF destination
+   |
+   | Name      : POPTIONS
+   | Default   :
+   | Type      : Text
+   | Purpose   : Other options to add to the plot command such as
+   |             poptions=%str(CAXIS=blue),
+   |             poptions=noframe autovref,
+   |             See SAS GPLOT documentation
+   |
+   *------------------------------------------------------------------*
+   | RETURNED INFORMATION
+   |
+   | Kaplan-Meier survival plot(s).
+   *------------------------------------------------------------------*
+   | ADDITIONAL NOTES
+   |
+   | DATE CREATED: 03/29/2005
+   | LAST REVISED: 02/01/2007 - Added RTFEXCL parameter so that if one wants
+   |                  to send plots to an RTF file by running the macro
+   |                  within an "ods rtf file=<filename>" statement, the
+   |                  procedure output will not be included
+   |               08/08/2007 - Added POPTIONS parameter to allow user to
+   |                  declare other options available in the PLOT statement
+   |                  of PROC GPLOT
+   |               08/30/2007 - Specifying CMARKS>0 but limiting the x-axis
+   |                  only with an axis statement and not with XMAX caused
+   |                  errors and prevented printing other ANNOTATE output.
+   |                  Noted in documentation. Also fixed _B2_ utility data
+   |                  set which was retaining more observations than
+   |                  necessary.
+   |               10/09/2008 - Added PRINTOP options 4 and 5. Also added
+   |                  parameters LABCOL, SCOLOR, PCOLOR to give user control
+   |                  over text color
+   |               08/10/2009 - Check parameter inputs, improve WHERE
+   |                  processing
+   |
+   *------------------------------------------------------------------*
+   | EXAMPLES
+   |
+   | title1 '#1 Basic macro call';
+   | %SURVPLOT(data=A, time=time, event=event);
+   |
+   | title1 '#2 Add censoring marks';
+   | %SURVPLOT(data=A, time=time, event=event, cmarks=1);
+   |
+   | title1 '#3 Subset to group 1 only';
+   | %SURVPLOT(data=A, time=time, event=event, where=%str(group=1) );
+   |
+   | title1 '#4 Separate plots by group';
+   | proc sort data=a; by group;
+   | %SURVPLOT(data=A, time=time, event=event, by=group );
+   |
+   |
+   | title1 '#5 Group-specific estimates, line labels, no legend';
+   | proc format; value gf 1='Group 1' 2='Group 2' 3='Group 3'; run;
+   | %SURVPLOT(data=A, time=time, event=event, class=group,
+   |           classft=gf, labels=1 2 3, f4=6, legend=0);
+   |
+   |
+   | title1 h=4pct '#6 Print N at risk, many other options';
+   | goptions ftext=swiss;
+   | axis1 order=(0 to 24 by 3) minor=(N=2) label=(h=4pct "Months")
+   |        origin=(15pct, 31pct) value=(h=4pct);
+   | axis2 order=(0 to 100 by 20) minor=(n=3) origin=(15pct , 31pct )
+   |       label=(a=90 h=5pct "Survival, %") value=(h=4pct);
+   | legend1 mode=SHARE across=1 label=NONE value=(j=l)
+   |         position=(inside bottom left);
+   | %SURVPLOT(data=A, time=time, event=event, class=group,
+   |           classft=gf, legend=1, percent=1, xaxis=1, yaxis=2, xmax=24,
+   |           printop=5, points='0 to 1095.75 by 182.625', f1=3, labels=1,
+   |           xdivisor=30.4375, testop=1, lcol=blue red green, lty=1,
+   |           pcolor=purple, scolor=blue orange, labcol=orange blue);
+   |
+   *------------------------------------------------------------------*
+   | Copyright 2009 Mayo Clinic College of Medicine.
+   |
+   | This program is free software; you can redistribute it and/or
+   | modify it under the terms of the GNU General Public License as
+   | published by the Free Software Foundation; either version 2 of
+   | the License, or (at your option) any later version.
+   |
+   | This program is distributed in the hope that it will be useful,
+   | but WITHOUT ANY WARRANTY; without even the implied warranty of
+   | MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+   | General Public License for more details.
+   *------------------------------------------------------------------*/
+ 
+ 
+%MACRO SURVPLOT(data= ,
+                time= ,
+                event= ,
+                cen_vl=0 ,
+                class= ,
+                testop = 0,
+                classft= ,
+                cmarks =0,
+                plotop=1,
+                printop=0,
+                points= ,
+                scolor=black,
+                xdivisor=365.25,
+                labels= ,
+                labcol=black,
+                by= ,
+                where= ,
+                legend= ,
+                yaxis=98,
+                xaxis=99,
+                xmax= ,
+                pvy=38.2,
+                pvx=38.2,
+                pcolor=black,
+                lty= 1 2 15 20 5 41 27 46 33 ,
+                lw = 4,
+                lcol=black,
+                percent=0,
+                font=SWISS,
+                f1=4.5,
+ 		f2=4.5,
+                f3=4.5,
+                f4=4.0,
+                plotname=,
+                annotate=,
+                rtfexcl=0,
+                poptions= );
+ 
+ 
+************* LOOK FOR ERRORS IN CALL *************;
+%LOCAL ERRORFLG;
+%LET ERRORFLG=0;
+ 
+%IF (&DATA=) %THEN %DO;
+  %PUT ERROR - Input parameter DATA is empty.;
+  %LET ERRORFLG=1;
+ %END;
+ 
+%IF (&TIME=) %THEN %DO;
+  %PUT ERROR - Input parameter TIME is empty.;
+  %LET ERRORFLG=1;
+ %END;
+ 
+%IF (&EVENT=) %THEN %DO;
+  %PUT ERROR - Input parameter EVENT is empty.;
+  %LET ERRORFLG=1;
+ %END;
+ 
+%IF &ERRORFLG=1 %THEN %DO;
+   %PUT Errors exist in the macro call. No output will be produced.;
+  %GOTO EXIT: ;
+ %END;
+ 
+ 
+ 
+********** DATA SETS CREATED **************
+*-----------------------------------------*
+_NCLASS_ : get number of classification levels
+_A_ : Survival estimates from PROC LIFETEST at observed event times
+_B_ : Estimates for requested time points
+_B1_: Estimates to be printed below plot
+_B2_: Labels for Groups on left below plot
+_C_ : Tests between strata, e.g. log-rank
+_D1_ : Censoring times for plot marks
+_D2_: Frequency of observed censoring times
+_D3_: Find smallest difference between censored time points
+_D_: Annotate data set for censoring marks
+_F_ : Placement of line labels from LABEL parameter
+_G_ : Data set for plotting
+_H_ : Annotate data set
+*******************************************;
+ 
+%LOCAL NCLASS LOOP LOOPM1 LABLIST TEMPLAB TEM2LAB ONEMINUS A B TLIST
+       LEGTEXT YAXTEXT XAXTEXT TESTNAME XORIG YORIG SFMT YMAX YBY;
+ 
+%IF (&CLASS= ) %THEN %LET TESTOP=0;
+ 
+**** GET NUMBER OF CLASS LEVELS ****;
+%IF (&CLASS^= ) %THEN %DO;
+  proc freq data=&DATA noprint;
+    %IF (&WHERE^= ) %THEN %DO; where &WHERE; %END;
+    table &CLASS / out=_nclass_;
+   run;
+  data _null_; set _nclass_ nobs=strata;
+    call symput('NCLASS', left(put(strata, 3.0)));
+   run;
+ %END;
+%ELSE %LET NCLASS=1;
+ 
+ 
+ 
+**** Extract colors and more for each group ****;
+%DO LOOP=1 %TO &NCLASS;
+  %LOCAL LABCOL&LOOP SCOL&LOOP COLOR&LOOP LTYPE&LOOP LWIDTH&LOOP;
+  %LET LOOPM1 = %EVAL(&LOOP-1);
+ 
+  %LET LABCOL&LOOP = %SCAN(&LABCOL, &LOOP);
+    %IF (&&LABCOL&LOOP= ) %THEN %LET LABCOL&LOOP=&&LABCOL&LOOPM1;
+ 
+  %LET SCOL&LOOP = %SCAN(&SCOLOR, &LOOP);
+    %IF (&&SCOL&LOOP= ) %THEN %LET SCOL&LOOP=&&SCOL&LOOPM1;
+ 
+  %LET COLOR&LOOP = %SCAN(&LCOL, &LOOP);
+    %IF (&&COLOR&LOOP= ) %THEN %LET COLOR&LOOP=&&COLOR&LOOPM1;
+ 
+  %LET LTYPE&LOOP = %SCAN(&LTY, &LOOP);
+    %IF (&&LTYPE&LOOP= ) %THEN %LET LTYPE&LOOP=&&LTYPE&LOOPM1;
+ 
+  %LET LWIDTH&LOOP = %SCAN(&LW, &LOOP);
+    %IF (&&LWIDTH&LOOP= ) %THEN %LET LWIDTH&LOOP=&&LWIDTH&LOOPM1;
+ 
+  %IF (&LABELS= ) %THEN %LET LABLIST= ;
+   %ELSE %IF &LOOP=1 %THEN %LET LABLIST= &LABELS;
+    %ELSE %DO;
+      %LET TEMPLAB = %SCAN(&LABELS, &LOOP);
+      %LET TEM2LAB = %SCAN(&LABLIST, &LOOPM1);
+      %IF (&TEMPLAB= ) %THEN %LET LABLIST=&LABLIST &TEM2LAB;
+     %END;
+ %END;
+ 
+ 
+%IF &PLOTOP=2 %THEN %LET ONEMINUS = 1- ;
+ %ELSE %LET ONEMINUS = ;
+ 
+%IF (&XDIVISOR= ) %THEN %LET XDIVISOR=1;
+ 
+ 
+%IF (&POINTS^= ) %THEN %DO;
+%let a = %index(&points,%str(%'));
+%if &a > 0 %then %do;
+   %let b = %eval(%length(&points)-1);
+   %let TLIST = %substr(&points,%eval(&a+1),%eval(&b-1));
+   %end;
+ %END;
+ 
+%IF &LEGEND=0 %THEN %LET LEGTEXT= nolegend;
+ %ELSE %IF &LEGEND>0 %THEN %LET LEGTEXT= legend=legend&LEGEND;
+   %ELSE %LET LEGTEXT= ;
+ 
+%IF &YAXIS>0 %THEN %LET YAXTEXT= vaxis=axis&YAXIS;
+ 
+%IF &XAXIS>0 %THEN %LET XAXTEXT= haxis=axis&XAXIS;
+ 
+ 
+ 
+ 
+******************************************************************
+PROC LIFETEST TO GET SURVIVAL ESTIMATES AND TESTS
+******************************************************************;
+ods listing close;
+ 
+*** According to SAS Note SN-014825, the number left at risk may be
+    incorrect when using the TIMELIST option. When the TIMELIST is not
+    specified, then the ProductLimitEstimates Table is always correct.
+ ***;
+ 
+%IF &RTFEXCL=1 %THEN %DO;
+  ods rtf EXCLUDE ALL;
+ %END;
+proc lifetest data=&DATA
+     outsurv=_A_
+     %IF (&CLASS^= ) %THEN %DO; (rename=(&CLASS=__class)) %END;
+     ;
+  %IF &PRINTOP>0 %THEN %DO;
+    ods output ProductLimitEstimates=_B_
+     %IF (&CLASS^= ) %THEN %DO; (rename=(&CLASS=__class)) %END;
+     ;
+   %END;
+  %IF &TESTOP>0 %THEN %DO;
+    ods output HomTests=_C_;
+   %END;
+  %IF (&WHERE^= ) %THEN %DO; where &WHERE; %END;
+  %IF (&BY^= ) %THEN %DO; by &BY; %END;
+  time &TIME * &EVENT (&CEN_VL);
+  %IF (&CLASS^= ) %THEN %DO;
+    strata &CLASS;
+    format &CLASS ;
+     *** Must unformat or STRATA will be ordered according to formatted
+         values, instead of internal values, which will cause labelling
+         problems between legend and No.at risk display ***;
+   %END;
+ run;
+ 
+ods listing;
+ 
+**** This data step is needed because LIFETEST does not output estimates
+     after the last event ****;
+proc sort data=_A_; by &BY
+ %IF (&CLASS^= ) %THEN %DO; __class %END; &TIME;
+data _A_;
+  set _A_;
+  by &BY %IF (&CLASS^= ) %THEN %DO; __class %END; &TIME;
+  drop lastsurv; retain lastsurv 1;
+  if survival=. then survival=lastsurv;
+  lastsurv=survival;
+ run;
+******************************************************************;
+******************************************************************;
+ 
+ 
+ 
+******************************************************************
+GET P-VALUE INTO ANNOTATE DATASET (_C_)
+******************************************************************;
+ 
+%ANNOMAC;
+%IF &TESTOP>0 %THEN %DO;
+  %IF &TESTOP=1 %THEN %LET TESTNAME=LOG-RANK;
+  %IF &TESTOP=2 %THEN %LET TESTNAME=WILCOXON;
+  %IF &TESTOP=3 %THEN %LET TESTNAME=-2LOG(LR);
+  data _C_;
+    set _C_;
+    length text $40;
+    %DCLANNO;
+    if upcase(test) = "&TESTNAME";
+    xsys='1'; ysys='1'; hsys='3';
+    x=&PVX; y=&PVY; position='E'; function='LABEL';
+    style="&FONT"; color="&PCOLOR"; size=&F3;
+    if probchisq>=.10 then text="p="||left(put(probchisq, 4.2));
+     else if probchisq>=.001 then
+      text="p="||left(put(probchisq, 5.3));
+       else if probchisq<.001 then text="p<0.001";
+   run;
+ %END;
+******************************************************************;
+******************************************************************;
+ 
+ 
+******************************************************************
+GET CENSOR TIMES INTO ANNOTATE DATASET (_D_)
+******************************************************************;
+ 
+%IF &CMARKS>0 %THEN %DO;
+ data _D1_;
+   set _A_;
+   where _CENSOR_=1;
+   %IF &NCLASS=1 %THEN %DO; stratum=1; %END;
+   keep &TIME &BY survival stratum;
+   %IF (&XMAX= ) %THEN %DO;
+     output; %END;
+   %ELSE %DO;
+     if (&TIME/&XDIVISOR)<=&XMAX then output; %END;
+  run;
+ proc freq data=_D1_ noprint;
+   %IF (&BY^= ) %THEN %DO; by &BY; %END;
+   table stratum*&TIME*survival / out=_D2_;
+  run;
+proc sort data=_d2_; by &BY stratum &TIME;
+data _D3_; *** Find smallest difference between time points ***;
+  set _d2_ end=eof; by &BY stratum &TIME;
+  keep _mintdist _maxcount;
+  retain _MinTdist _maxcount .;
+  if first.stratum=0 then
+    _MinTdist = min(_mintdist, abs(&TIME - lag(&TIME)));
+  _maxcount=max(_maxcount, count);
+  if eof;
+ run;
+ **** Create annotate data set for censoring marks ****;
+ data _D_;
+   set _D2_; if _N_=1 then set _D3_;
+   %DCLANNO;
+   %DO LOOP=1 %TO &NCLASS;
+     if stratum=&LOOP then _color_="&&COLOR&LOOP";
+    %END;
+   %IF &CMARKS=2 %THEN %DO;
+     *** This code draws a larger mark for more people censored ***;
+     x=&TIME/&XDIVISOR;
+     y=(100**&PERCENT)*( &ONEMINUS survival);
+     function='MOVE'; xsys='2'; ysys='2';
+     output;
+     ysys='7'; y=0;
+     do loop=1 to count; y=y+(3/4)**(loop-1); end;
+     function='DRAW'; size=1;
+     output;
+    %END;
+   %ELSE %DO;
+     *** This code intends to offset the marks ***;
+     do loop=1 to count;
+       *** We try to offset multiple censors at the same time point ***;
+       x=(&TIME + ( (loop/(count+1)) -  0.5)*_mintdist)/&XDIVISOR;
+       y=(100**&PERCENT)*( &ONEMINUS survival);
+       function='MOVE'; xsys='2'; ysys='2';
+       output;
+       *** The notches are 2% of the height of the Y-axis ***;
+       ysys='7'; y=2; function='DRAW'; size=1;
+       output;
+      end;
+     %END;
+  run;
+ %END; **** End to "%IF &CMARKS>0 %THEN %DO" ****;
+ 
+******************************************************************;
+******************************************************************;
+ 
+ 
+******************************************************************
+GET SPECIFIED STATISTICS AT T INTO ANNOTATE DATASET (_B1_)
+******************************************************************;
+ 
+%IF &PRINTOP>0 %THEN %DO;
+proc sort data=_B_; by &BY stratum &TIME;
+data _B_;
+  set _B_;
+  keep &BY stratum &TIME survival failed left ___flag_ __class;
+  by &BY stratum;
+  if last.stratum then do;
+     output;
+     do &TIME=&TLIST;
+        ___flag_=1; survival=.; failed=.; left=.;
+        output;
+       end;
+    end;
+   else output;
+proc sort; by &BY stratum &TIME;
+ run;
+ 
+data _B_;
+  set _B_;
+  by &BY stratum &TIME;
+  keep ___flag_ &BY stratum &TIME survival failed atrisk __class;
+  retain lastsurv atrisk lagleft lagfail lagrisk;
+  if first.&TIME then AtRisk=lagleft;
+  if first.stratum then AtRisk=Left; *** This is Time=0 ***;
+  if survival ne . then lastsurv=survival;
+  if ___flag_=1 then do;
+      Failed=lagfail;
+      Left=lagleft;  *** Need to make AtRisk correct for some obs. **;
+      survival=lastsurv;
+    end;
+  output;
+  lagleft=left;  *** Need to call these for every obs. ***;
+  lagrisk=atrisk;
+  lagfail=failed;
+ run;
+ 
+***** Determine location of origin of plot and other things *****;
+proc sort data=_B_; by stratum;
+data _null_; *** Create macro variables XORIG, YORIG ***;
+  length text $40;
+  set _B_ end=eof; by stratum;
+  retain MaxLab 0; *** MaxLab = length of longest label ***;
+ 
+  if first.stratum then do;
+    %IF &NCLASS=1 %THEN %DO;
+      maxlab=0;
+     %END;
+    %ELSE %DO;
+      %IF (&CLASSFT= ) %THEN %DO;
+        if vtype(__class)='N' then text=right(put(__class, 9.0));
+        if vtype(__class)='C' then text=right(__class);
+       %END;
+      %ELSE %DO;
+        text=right(put(__class, &CLASSFT..));
+       %END;
+      if length(text)>maxlab then maxlab=length(left(text));
+     %END;
+   end;
+  if eof then do;
+     *** formulae below to determine origin for default axes are
+         based on trial and error and may not always be ideal ***;
+     %IF &PRINTOP>0 %THEN %DO;
+       YORIG = 19 + (&F1 + 0.75)*&NCLASS;
+       XORIG = max(12, 4+(&F1/2.75)*maxlab);
+       call symput('XORIG', put(xorig, 3.0));
+       call symput('YORIG', put(yorig, 3.0));
+      %END;
+    end;
+ run;
+ 
+***** Get number at risk *****;
+ *** _B1_ : estimates at given timepoints ***;
+ *** _B2_ : labels for group estimates on left ***;
+proc sort data=_B_; by &BY stratum;
+data _B1_;
+  length text $40;
+  set _B_;
+  if ___flag_=1;
+  %DCLANNO;
+  xsys='2';
+  hsys='3';
+  ysys='3';
+  x= &TIME / &XDIVISOR ;
+  %IF (&XMAX^= ) %THEN %DO; if x>&XMAX then delete; %END;
+ 
+   *** Formulae below is based on trial and error ***;
+  y = 5 + (&F1 + 0.75)*&NCLASS - (&F1 + 0.5)*stratum;
+  function='LABEL';
+  %IF &PRINTOP=1 %THEN %DO; *** Print number at risk ***;
+     text=left(put(AtRisk, 8.0));
+    %END;
+  %IF &PRINTOP=2 %THEN %DO; *** Print number of events ***;
+     text=left(put(failed, 8.0));
+    %END;
+  %IF &PRINTOP=3 %THEN %DO; *** Print survival estimate ***;
+    %IF &PERCENT=0 %THEN %LET SFMT=4.2;
+    %IF &PERCENT=1 %THEN %LET SFMT=5.1;
+    text=left(put( (100**&PERCENT)*( &ONEMINUS survival), &SFMT));
+   %END;
+  %IF &PRINTOP=4 %THEN %DO; *** Print survival estimate ***;
+    %IF &PERCENT=0 %THEN %LET SFMT=4.2;
+    %IF &PERCENT=1 %THEN %LET SFMT=5.1;
+    text=left(put( (100**&PERCENT)*( &ONEMINUS survival), &SFMT))
+         ||"("||trim(left(put(AtRisk,8.0)))||")" ;
+   %END;
+  %IF &PRINTOP=5 %THEN %DO; *** Print survival estimate ***;
+    %IF &PERCENT=0 %THEN %LET SFMT=4.2;
+    %IF &PERCENT=1 %THEN %LET SFMT=5.1;
+    text=left(put( (100**&PERCENT)*( &ONEMINUS survival), &SFMT))
+         ||"("||trim(left(put(failed,8.0)))||")" ;
+   %END;
+  %DO LOOP=1 %TO &NCLASS;
+      if stratum=&LOOP then color="&&SCOL&LOOP";
+     %END; ;
+  style="&FONT"; size=&F1; position='5';
+ run;
+ 
+ 
+%IF (&NCLASS>1) %THEN %DO;
+ 
+data _B2_;
+  length text $40;
+  set _B_; by &BY stratum;
+  %DCLANNO;
+ 
+  if first.stratum then do;
+    xsys='3'; ysys='3'; hsys='3'; size=&F1;
+    function='LABEL';
+    %IF (&CLASSFT= ) %THEN %DO;
+      if vtype(__class)='N' then text=trim(put(__class, 9.0));
+      if vtype(__class)='C' then text=trim(__class);
+     %END;
+    %ELSE %DO;
+      text=trim(put(__class, &CLASSFT..));
+     %END;
+    x = &XORIG - 3; position='4';
+    y = 5 + (&F1 + 0.75)*&NCLASS - (&F1 + 0.5)*stratum;
+    **** The line below left justifies the labels ****;
+    x=2; position='6';
+    style="&FONT";
+    color="black";
+ 
+    *** Lines below would allow colored labels ***;
+    %DO LOOP=1 %TO &NCLASS;
+      if stratum=&LOOP then color="&&LABCOL&LOOP";
+     %END; ;
+    output;
+   end;
+ run;
+ 
+%END; *** for "%IF (&NCLASS>1) %THEN %DO" ***;
+ 
+%END; *** for "%IF &PRINTOP>0 %THEN %DO" ***;
+ 
+******************************************************************;
+******************************************************************;
+ 
+ 
+******************************************************************
+GET LINE LABELS INTO ANNOTATE DATASET (_F_)
+******************************************************************;
+ 
+%IF (&LABELS^= ) %THEN %DO;
+proc sort data=_A_; by &BY stratum &TIME;
+data _F_;
+   length text $40;
+   set _A_;
+   %DCLANNO;
+   by &BY stratum &TIME;
+   array __lab__(&NCLASS) _TEMPORARY_ (&LABLIST);
+ 
+   %IF (&XMAX^= ) %THEN %DO;
+     retain skip 0 _lasts_;
+     %IF (&NCLASS=1) %THEN %DO;
+      if _N_=1 then skip=0;
+      %END;
+     %ELSE %IF (&NCLASS>1) %THEN %DO;
+      if first.stratum then skip=0;
+      %END;
+     _est_=(100**&PERCENT)*( &ONEMINUS survival);
+     if skip=0;
+      if (&TIME/&XDIVISOR)>&XMAX then do;
+         skip=1;
+         *** should extend estimates to XMAX if defined ***;
+         x=&XMAX;
+         y=_lasts_;
+         GOTO MARKER;
+        end;
+       else do;
+          _lasts_=_est_;
+          if last.stratum then do;
+             x= &TIME/&XDIVISOR;
+             y=_lasts_;
+             GOTO MARKER;
+            end;
+           else delete;
+        end;
+     %END;
+ 
+   %ELSE %DO;
+     if last.stratum;
+     x=&TIME/&XDIVISOR;
+     y=(100**&PERCENT)*( &ONEMINUS survival);
+    %END;
+ 
+  %IF (&XMAX^= ) %THEN %DO; MARKER: %END;
+    xsys='2'; ysys='2'; hsys='1';
+    if __lab__(stratum)=1 then position='1';
+     else if __lab__(stratum)=2 then position='6';
+      else if __lab__(stratum)=3 then position='D';
+       else position='C';
+    function='LABEL';
+     %IF (&CLASSFT= ) %THEN %DO;
+       if vtype(__class)='N' then text=trim(put(__class, 9.0));
+       if vtype(__class)='C' then text=trim(__class);
+      %END;
+     %ELSE %DO;
+       text=trim(put(__class, &CLASSFT..));
+      %END;
+    %DO LOOP=1 %TO &NCLASS;
+       if stratum=&LOOP then color="&&LABCOL&LOOP";
+      %END;
+    style="&FONT";
+    size=&F4;
+  run;
+ %END; *** END to if &LABEL^= THEN DO ***;
+ 
+ 
+******************************************************************;
+******************************************************************;
+ 
+ 
+******************************************************************
+PUT TOGETHER ENTIRE ANNOTATE DATA SET
+******************************************************************;
+ 
+%IF (&TESTOP>0) |
+    (&CMARKS>0) |
+    (&PRINTOP>0) |
+    (&LABELS^= ) |
+    (&ANNOTATE^= )
+ %THEN %DO;
+ 
+  data _H_; **** Annotate data set ****;
+    set
+     &ANNOTATE
+    %IF &CMARKS>0 %THEN %DO;
+       %if %sysfunc(exist(_D_)) %THEN %DO; _D_ %END;
+     %END;
+    %IF &TESTOP>0 %THEN %DO;
+       %if %sysfunc(exist(_C_)) %THEN %DO;  _C_ %END;
+      %END;
+    %IF &PRINTOP>0 %THEN %DO;
+       %if %sysfunc(exist(_B1_)) %THEN %DO;  _B1_ %END;
+       %if %sysfunc(exist(_B2_)) %THEN %DO;  _B2_ %END;
+     %END;
+    %if %sysfunc(exist(_F_)) %THEN %DO;  _F_ %END;
+    ;
+   run;
+  %IF (&BY^= ) %THEN %DO; proc sort; by &BY; %END;
+ %END;
+ 
+ 
+******************************************************************;
+******************************************************************;
+ 
+ 
+******************************************************************
+CREATE DATA SET FOR PLOTTING
+******************************************************************;
+ 
+proc sort data=_A_; by &BY
+  %IF (&CLASS^= ) %THEN %DO; __class %END; &TIME;
+data _G_;
+  set _A_;
+  by &BY %IF (&CLASS^= ) %THEN %DO; __class %END; &TIME;
+  keep &BY &TIME survival _xtime_ _est_
+       %IF (&CLASS^= ) %THEN %DO; __class %END;
+      ;
+  _xtime_ = &TIME / &XDIVISOR;
+  _est_ = (100**&PERCENT) * (&ONEMINUS survival);
+ 
+  %IF (&XMAX^= ) %THEN %DO;
+    retain skip 0 _lasts_;
+    %IF (&NCLASS=1) %THEN %DO;
+     if _N_=1 then skip=0;
+     %END;
+    %ELSE %IF (&NCLASS>1) %THEN %DO;
+     if first.__class then skip=0;
+     %END;
+ 
+    if skip=0;
+     if _xtime_>&XMAX then do;
+        skip=1;
+        *** should extend estimates to XMAX if defined ***;
+        _xtime_=&XMAX;
+        _est_=_lasts_;
+        output;
+        _lasts_=.;
+       end;
+      else do;
+         output;
+         _lasts_=_est_;
+       end;
+ 
+    %END;
+ run;
+ 
+ 
+******************************************************************;
+******************************************************************;
+ 
+ 
+******************************************************************
+CREATE SOME DEFAULT PLOTTING DETAILS
+******************************************************************;
+ 
+data _null_;***  Determine Y-axis tick marks  ***;
+   _ymax_ = 100**&PERCENT;
+   _yby_ = _Ymax_/5;
+   call symput('YMAX', put(_ymax_, 6.2));
+   call symput('YBY', put(_yby_, 6.2));
+ run;
+ 
+%DO LOOP=1 %TO &NCLASS;
+ symbol&LOOP v=NONE i=stepjl mode=include
+             l=&&LTYPE&LOOP ci=&&COLOR&LOOP w=&&LWIDTH&LOOP;
+ %END;
+ 
+ axis98 order=(0 to &YMAX by &YBY)
+        label=(a=90 f=&FONT h=&F2.pct "Kaplan-Meier estimate")
+        minor=(N=3) value=(f=&FONT h=&F2.pct)
+        %IF &PRINTOP>0 & (&XAXIS=99) %THEN %DO;
+          origin=(&XORIG.pct, &YORIG.pct) %END;
+        ;
+ axis99 label=(f=&FONT h=&F2.pct "Time") value=(f=&FONT h=&F2.pct)
+        %IF &PRINTOP>0 & (&YAXIS=98) %THEN %DO;
+          origin=(&XORIG.pct, &YORIG.pct) %END;
+        ;
+ 
+******************************************************************;
+ 
+******************************************************************;
+ 
+ 
+******************************************************************
+RUN PROC GPLOT
+******************************************************************;
+ 
+  ods listing;
+  ods exclude NONE;
+  proc gplot data=_G_;
+   %IF (&BY^= ) %THEN %DO; by &BY; %END;
+   plot _EST_*_XTIME_
+     %IF &NCLASS>1 %THEN %DO; = __class %END;
+     / &POPTIONS
+       &XAXTEXT &YAXTEXT
+       %IF %SYSFUNC(EXIST(_H_)) %THEN %DO; annotate=_H_  %END;
+       %IF (&LEGEND^= ) %THEN %DO; &LEGTEXT %END;
+       %IF (&PLOTNAME^= ) %THEN %DO; name="&PLOTNAME"  %END;
+        ;
+     %IF (&CLASSFT^= ) %THEN %DO; format __class &CLASSFT..; %END;
+   run; quit;
+ 
+******************************************************************;
+******************************************************************;
+ 
+ 
+******************************************************************
+DELETE TEMPORARY DATA SETS
+******************************************************************;
+ 
+proc datasets lib=work nolist;
+   delete _A_ _G_
+          %IF %SYSFUNC(EXIST(_NCLASS_)) %THEN %DO; _NCLASS_ %END;
+          %IF %SYSFUNC(EXIST(_B_)) %THEN %DO; _B_ %END;
+          %IF %SYSFUNC(EXIST(_B1_)) %THEN %DO; _B1_ %END;
+          %IF %SYSFUNC(EXIST(_B2_)) %THEN %DO; _B2_ %END;
+          %IF %SYSFUNC(EXIST(_C_)) %THEN %DO; _C_ %END;
+          %IF %SYSFUNC(EXIST(_D1_)) %THEN %DO; _D1_ %END;
+          %IF %SYSFUNC(EXIST(_D2_)) %THEN %DO; _D2_ %END;
+          %IF %SYSFUNC(EXIST(_D3_)) %THEN %DO; _D3_ %END;
+          %IF %SYSFUNC(EXIST(_D_)) %THEN %DO; _D_ %END;
+          %IF %SYSFUNC(EXIST(_F_)) %THEN %DO; _F_ %END;
+          %IF %SYSFUNC(EXIST(_H_)) %THEN %DO; _H_ %END;
+          ;
+ run; quit;
+******************************************************************;
+******************************************************************;
+ 
+%EXIT:
+ 
+%MEND SURVPLOT;
